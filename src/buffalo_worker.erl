@@ -1,6 +1,5 @@
 -module(buffalo_worker).
 -behaviour(gen_server).
--define(SERVER, ?MODULE).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -20,21 +19,24 @@
 %% ------------------------------------------------------------------
 
 start_link(Args) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+    gen_server:start_link(?MODULE, Args, []).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init(Args) ->
-    io:format("Worker starting! ~p~n", [Args]),
-    {ok, Args}.
+init(MFA) ->
+    {ok, MFA, 0}.
 
 handle_call(_Call, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+handle_info(timeout, {Module, Function, Args}) ->
+    Result = erlang:apply(Module, Function, Args),
+    {stop, Result, done};
 
 handle_info(_Info, State) ->
     {noreply, State}.

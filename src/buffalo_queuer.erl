@@ -29,7 +29,7 @@ queue(Module, Function, Arguments, Timeout) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init(Args) ->
+init(_Args) ->
     {ok, []}.
 
 handle_call({queue, MFA, Timeout}, _From, All) ->
@@ -45,8 +45,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({timeout, MFA}, State) ->
-    io:format("INFO! ~p~n", [MFA]),
-    supervisor:start_child(buffalo_worker_sup, [MFA]),
+    {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
