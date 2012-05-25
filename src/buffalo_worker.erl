@@ -1,4 +1,4 @@
--module(buffalo_queuer).
+-module(buffalo_worker).
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
@@ -6,7 +6,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0, queue/4]).
+-export([start_link/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -19,34 +19,24 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-
-queue(Module, Function, Arguments, Timeout) ->
-    gen_server:call(?SERVER, {queue, {Module, Function, Arguments}, Timeout}).
+start_link(Args) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
 init(Args) ->
-    {ok, []}.
+    io:format("Worker starting! ~p~n", [Args]),
+    {ok, Args}.
 
-handle_call({queue, MFA, Timeout}, _From, All) ->
-    case lists:keyfind(MFA, 2, All) of
-        {OldRef, _} ->
-            erlang:cancel_timer(OldRef);
-        false -> nop
-    end,
-    Ref = erlang:send_after(Timeout, self(), {timeout, MFA}),
-    {reply, ok, [{Ref, MFA}|All]}.
+handle_call(_Call, _From, State) ->
+    {reply, ok, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({timeout, MFA}, State) ->
-    io:format("INFO! ~p~n", [MFA]),
-    supervisor:start_child(buffalo_worker_sup, [MFA]),
+handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
