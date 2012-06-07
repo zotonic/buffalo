@@ -35,8 +35,8 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(timeout, {Module, Function, Args}) ->
-    Result = erlang:apply(Module, Function, Args),
-    {stop, Result, done};
+    ok = erlang:apply(Module, Function, Args),
+    {stop, normal, undefined};
 
 handle_info(_Info, State) ->
     {noreply, State}.
