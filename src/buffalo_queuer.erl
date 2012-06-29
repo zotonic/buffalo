@@ -49,7 +49,6 @@ handle_cast(_Msg, State) ->
 handle_info({timeout, MFA}, All) ->
     {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
     New = lists:keydelete(MFA, 2, All),
-    lager:info("timeout!!! ~p, ~p", [MFA, New]),
     {noreply, New}.
 
 terminate(_Reason, _State) ->
