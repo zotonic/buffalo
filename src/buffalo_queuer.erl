@@ -33,13 +33,15 @@ init(_Args) ->
     {ok, []}.
 
 handle_call({queue, MFA, Timeout}, _From, All) ->
-    case lists:keyfind(MFA, 2, All) of
-        {OldRef, _} ->
-            erlang:cancel_timer(OldRef);
-        false -> nop
-    end,
+    Ret = case lists:keyfind(MFA, 2, All) of
+              {OldRef, _} ->
+                  erlang:cancel_timer(OldRef),
+                  existing;
+              false ->
+                  new
+          end,
     Ref = erlang:send_after(Timeout, self(), {timeout, MFA}),
-    {reply, ok, [{Ref, MFA}|All]}.
+    {reply, {ok, Ret}, [{Ref, MFA}|All]}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
