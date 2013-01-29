@@ -24,6 +24,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+    ets:new(buffalo, [named_table, public]),
     Children = [?CHILD(buffalo_worker_sup, supervisor),
                 ?CHILD(buffalo_queuer, worker)],
     {ok, { {one_for_one, 5, 10}, Children} }.

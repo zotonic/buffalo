@@ -32,24 +32,26 @@ queue(Module, Function, Arguments, Timeout) ->
 init(_Args) ->
     {ok, []}.
 
-handle_call({queue, MFA, Timeout}, _From, All) ->
-    {Ret, List} = case lists:keyfind(MFA, 2, All) of
-              {OldRef, _} ->
-                          erlang:cancel_timer(OldRef),
-                          {existing, lists:keydelete(MFA, 2, All)};
-                      false ->
-                          {new, All}
-                  end,
+handle_call({queue, MFA, Timeout}, _From, State) ->
+    Ret = case ets:lookup(buffalo, MFA) of
+              [{MFA, OldRef}] ->
+                  erlang:cancel_timer(OldRef),
+                  ets:delete(buffalo, MFA),
+                  existing;
+              [] ->
+                  new
+          end,
     Ref = erlang:send_after(Timeout, self(), {timeout, MFA}),
-    {reply, {ok, Ret}, [{Ref, MFA}|List]}.
+    ets:insert(buffalo, {MFA, Ref}),
+    {reply, {ok, Ret}, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({timeout, MFA}, All) ->
+handle_info({timeout, MFA}, State) ->
     {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
-    New = lists:keydelete(MFA, 2, All),
-    {noreply, New}.
+    ets:delete(buffalo, MFA),
+    {noreply, State}.
 
 terminate(_Reason, _State) ->
     ok.
