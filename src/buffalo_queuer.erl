@@ -6,7 +6,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0, queue/4]).
+-export([start_link/0, queue/4, cancel/3]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -22,6 +22,9 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+cancel(Module, Function, Arguments) ->
+    gen_server:call(?SERVER, {cancel, {Module, Function, Arguments}}).
+
 queue(Module, Function, Arguments, Timeout) ->
     gen_server:call(?SERVER, {queue, {Module, Function, Arguments}, Timeout}).
 
@@ -31,6 +34,17 @@ queue(Module, Function, Arguments, Timeout) ->
 
 init(_Args) ->
     {ok, []}.
+
+handle_call({cancel, MFA}, _From, State) ->
+    Ret = case ets:lookup(buffalo, MFA) of
+              [{MFA, OldRef}] ->
+                  erlang:cancel_timer(OldRef),
+                  ets:delete(buffalo, MFA),
+                  ok;
+              [] ->
+                  {error, notfound}
+          end,
+    {reply, Ret, State};
 
 handle_call({queue, MFA, Timeout}, _From, State) ->
     Ret = case ets:lookup(buffalo, MFA) of
