@@ -20,8 +20,17 @@
 
 -export([
     start/0,
-    queue/2, queue/3, queue/4, queue/5,
-    cancel/1, cancel/3
+    queue/2, queue/3,
+    cancel/1
+]).
+
+-deprecated([{queue,4,eventually}]).
+-deprecated([{queue,5,eventually}]).
+-deprecated([{cancel,3,eventually}]).
+
+-export([
+    queue/4, queue/5,
+    cancel/3
 ]).
 
 -type options() :: #{
