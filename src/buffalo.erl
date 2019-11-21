@@ -38,11 +38,11 @@
 start() ->
     application:start(buffalo).
 
--spec queue( mfa(), options() ) -> ok.
+-spec queue( mfa(), options() ) -> {ok, existing | new}.
 queue(MFA, Opts) ->
     buffalo_queuer:queue(MFA, Opts).
 
--spec queue( key(), mfa(), options() ) -> ok.
+-spec queue( key(), mfa(), options() ) -> {ok, existing | new}.
 queue(Key, MFA, Opts) ->
     buffalo_queuer:queue(Key, MFA, Opts).
 
@@ -54,12 +54,12 @@ cancel(Key) ->
 
 
 %% @doc Deprecated API
--spec queue( atom(), atom(), list(), pos_integer() ) -> ok.
+-spec queue( atom(), atom(), list(), pos_integer() ) -> {ok, existing | new}.
 queue(Module, Function, Arguments, Timeout) when is_integer(Timeout) ->
     buffalo_queuer:queue({Module, Function, Arguments}, #{ timeout => Timeout }).
 
 %% @doc Deprecated API
--spec queue( key(), atom(), atom(), list(), pos_integer() ) -> ok.
+-spec queue( key(), atom(), atom(), list(), pos_integer() ) -> {ok, existing | new}.
 queue(Key, Module, Function, Arguments, Timeout) when is_integer(Timeout) ->
     buffalo_queuer:queue(Key, {Module, Function, Arguments}, #{ timeout => Timeout }).
 
