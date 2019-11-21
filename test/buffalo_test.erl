@@ -45,7 +45,7 @@ cleanup(_) ->
 test_timeout() ->
     Unit = 100,
     Msg = ping,
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit}),
     ok = dont_receive(Unit-10),
     Msg = do_receive(Msg, Unit),
     ok.
@@ -53,7 +53,7 @@ test_timeout() ->
 test_cancel() ->
     Unit = 100,
     Msg = ping,
-    buffalo:queue(cancel_test, ?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue(cancel_test, {?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     buffalo:cancel(cancel_test),
     ok = dont_receive(2*Unit),
     ok.
@@ -61,9 +61,9 @@ test_cancel() ->
 test_update() ->
     Unit = 100,
     Msg = ping,
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
     Msg = do_receive(Msg, Unit),
     ok.
@@ -71,21 +71,21 @@ test_update() ->
 test_deadline() ->
     Unit = 100,
     Msg = ping,
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.5*Unit)),
-    buffalo:queue(?MODULE, send, [self(), Msg], Unit),
+    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
     % We are now at 4.7 x initial unit
     % The deadline (at 5x) should trigger soon.
     Msg = do_receive(Msg, trunc(0.4*Unit)),

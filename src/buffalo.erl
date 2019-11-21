@@ -17,21 +17,53 @@
 %% limitations under the License.
 
 -module(buffalo).
--export([start/0, queue/4, queue/5, cancel/1, cancel/3]).
+
+-export([
+    start/0,
+    queue/2, queue/3, queue/4, queue/5,
+    cancel/1, cancel/3
+]).
+
+-type options() :: #{
+        timeout => pos_integer(),
+        deadline => pos_integer()
+    }.
+
+-type key() :: term().
+
+-export_type([options/0, key/0]).
 
 %% API
 
 start() ->
     application:start(buffalo).
 
-queue(Module, Function, Arguments, Timeout) ->
-    buffalo_queuer:queue(Module, Function, Arguments, Timeout).
+-spec queue( mfa(), options() ) -> ok.
+queue(MFA, Opts) ->
+    buffalo_queuer:queue(MFA, Opts).
 
-queue(Key, Module, Function, Arguments, Timeout) ->
-    buffalo_queuer:queue(Key, Module, Function, Arguments, Timeout).
+-spec queue( key(), mfa(), options() ) -> ok.
+queue(Key, MFA, Opts) ->
+    buffalo_queuer:queue(Key, MFA, Opts).
 
-cancel(Module, Function, Arguments) ->
-    buffalo_queuer:cancel(Module, Function, Arguments).
-
+-spec cancel( mfa() | key() ) -> ok | {error, notfound}.
+cancel({Module, Function, Arguments} = MFA) when is_atom(Module), is_atom(Function), is_list(Arguments) ->
+    buffalo_queuer:cancel_mfa(MFA);
 cancel(Key) ->
-    buffalo_queuer:cancel(Key).
+    buffalo_queuer:cancel_key(Key).
+
+
+%% @doc Deprecated API
+-spec queue( atom(), atom(), list(), pos_integer() ) -> ok.
+queue(Module, Function, Arguments, Timeout) when is_integer(Timeout) ->
+    buffalo_queuer:queue({Module, Function, Arguments}, #{ timeout => Timeout }).
+
+%% @doc Deprecated API
+-spec queue( key(), atom(), atom(), list(), pos_integer() ) -> ok.
+queue(Key, Module, Function, Arguments, Timeout) when is_integer(Timeout) ->
+    buffalo_queuer:queue(Key, {Module, Function, Arguments}, #{ timeout => Timeout }).
+
+%% @doc Deprecated API
+-spec cancel(atom(), atom(), list()) -> ok | {error, notfound}.
+cancel(Module, Function, Arguments) ->
+    buffalo_queuer:cancel_mfa({Module, Function, Arguments}).

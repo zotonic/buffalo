@@ -27,7 +27,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0, queue/4, queue/5, cancel/1, cancel/3]).
+-export([start_link/0, queue/2, queue/3, cancel_key/1, cancel_mfa/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -43,17 +43,17 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-cancel(Key) ->
+cancel_key(Key) ->
     gen_server:call(?SERVER, {cancel, Key}).
 
-cancel(Module, Function, Arguments) ->
-    cancel(key(Module, Function, Arguments)).
+cancel_mfa(MFA) ->
+    cancel_key(key(MFA)).
 
-queue(Module, Function, Arguments, Timeout) ->
-    queue(key(Module, Function, Arguments), Module, Function, Arguments, Timeout).
+queue(MFA, Options) ->
+    queue(key(MFA), MFA, Options).
 
-queue(Key, Module, Function, Arguments, Timeout) ->
-    gen_server:call(?SERVER, {queue, Key, {Module, Function, Arguments}, Timeout}).
+queue(Key, MFA, Options) ->
+    gen_server:call(?SERVER, {queue, Key, MFA, Options}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -73,8 +73,8 @@ handle_call({cancel, Key}, _From, State) ->
           end,
     {reply, Ret, State};
 
-handle_call({queue, Key, MFA, Timeout}, _From, State) ->
-    {ok, Ret} = add_mfa(Key, MFA, Timeout),
+handle_call({queue, Key, MFA, Options}, _From, State) ->
+    {ok, Ret} = add_mfa(Key, MFA, Options),
     {reply, {ok, Ret}, State}.
 
 handle_cast(_Msg, State) ->
@@ -94,8 +94,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-key(M, F, A) ->
-    {M, F, A}.
+key({_M, _F, _A} = MFA) ->
+    MFA.
 
 start_key(Key) ->
     case ets:lookup(buffalo, Key) of
@@ -111,25 +111,34 @@ start_mfa(MFA) ->
     {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]).
 
 
-add_mfa(Key, MFA, Timeout) ->
-    add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Timeout).
+add_mfa(Key, MFA, Options) ->
+    add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options).
 
 
-add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline}], Now, Key, MFA, _Timeout) when Deadline =< Now ->
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline}], Now, Key, MFA, _Options) when Deadline =< Now ->
     erlang:cancel_timer(OldRef),
     start_mfa(MFA),
     ets:delete(buffalo, Key),
     {ok, existing};
-add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Timeout) ->
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Options) ->
     erlang:cancel_timer(OldRef),
+    Timeout = timeout(Options),
     NextTimeout = erlang:min(Timeout, Deadline-Now),
-    NewRef = erlang:send_after(NextTimeout, self(), {timeout, MFA}),
+    NewRef = erlang:send_after(NextTimeout, self(), {timeout, Key}),
     ets:insert(buffalo, Entry#buffalo_entry{timer=NewRef, mfa=MFA}),
     {ok, existing};
-add_mfa_1([], Now, Key, MFA, Timeout) ->
-    NewRef = erlang:send_after(Timeout, self(), {timeout, MFA}),
-    ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Timeout*?DEADLINE_MULTIPLIER}),
+add_mfa_1([], Now, Key, MFA, Options) ->
+    Timeout = timeout(Options),
+    Deadline = deadline(Options),
+    NewRef = erlang:send_after(Timeout, self(), {timeout, Key}),
+    ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Deadline}),
     {ok, new}.
+
+timeout(#{ timeout := Timeout }) -> Timeout;
+timeout(_Options) -> ?DEFAULT_TIMEOUT.
+
+deadline(#{ deadline := Deadline }) -> Deadline;
+deadline(Options) -> timeout(Options) * ?DEADLINE_MULTIPLIER.
 
 
 current_msecs() ->
