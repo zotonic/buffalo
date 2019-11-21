@@ -1,5 +1,8 @@
 -module(buffalo_queuer).
 -behaviour(gen_server).
+
+-include("../include/buffalo.hrl").
+
 -define(SERVER, ?MODULE).
 
 %% ------------------------------------------------------------------
@@ -43,7 +46,7 @@ init(_Args) ->
 
 handle_call({cancel, Key}, _From, State) ->
     Ret = case ets:lookup(buffalo, Key) of
-              [{Key, _MFA, OldRef}] ->
+              [#buffalo_entry{key=Key, timer=OldRef}] ->
                   erlang:cancel_timer(OldRef),
                   ets:delete(buffalo, Key),
                   ok;
@@ -53,24 +56,14 @@ handle_call({cancel, Key}, _From, State) ->
     {reply, Ret, State};
 
 handle_call({queue, Key, MFA, Timeout}, _From, State) ->
-    Ret = case ets:lookup(buffalo, Key) of
-              [{Key, _OldMFA, OldRef}] ->
-                  erlang:cancel_timer(OldRef),
-                  ets:delete(buffalo, Key),
-                  existing;
-              [] ->
-                  new
-          end,
-    Ref = erlang:send_after(Timeout, self(), {timeout, Key, MFA}),
-    ets:insert(buffalo, {Key, MFA, Ref}),
+    {ok, Ret} = add_mfa(Key, MFA, Timeout),
     {reply, {ok, Ret}, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({timeout, Key, MFA}, State) ->
-    {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
-    ets:delete(buffalo, Key),
+handle_info({timeout, Key}, State) ->
+    ok = start_key(Key),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -85,3 +78,43 @@ code_change(_OldVsn, State, _Extra) ->
 
 key(M, F, A) ->
     {M, F, A}.
+
+start_key(Key) ->
+    case ets:lookup(buffalo, Key) of
+        [] ->
+            ok;
+        [#buffalo_entry{mfa=MFA}] ->
+            start_mfa(MFA),
+            ets:delete(buffalo, Key),
+            ok
+    end.
+
+start_mfa(MFA) ->
+    {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]).
+
+
+add_mfa(Key, MFA, Timeout) ->
+    add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Timeout).
+
+
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline}], Now, Key, MFA, _Timeout) when Deadline =< Now ->
+    erlang:cancel_timer(OldRef),
+    start_mfa(MFA),
+    ets:delete(buffalo, Key),
+    {ok, existing};
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Timeout) ->
+    erlang:cancel_timer(OldRef),
+    NextTimeout = erlang:min(Timeout, Deadline-Now),
+    NewRef = erlang:send_after(NextTimeout, self(), {timeout, MFA}),
+    ets:insert(buffalo, Entry#buffalo_entry{timer=NewRef, mfa=MFA}),
+    {ok, existing};
+add_mfa_1([], Now, Key, MFA, Timeout) ->
+    NewRef = erlang:send_after(Timeout, self(), {timeout, MFA}),
+    ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Timeout*?DEADLINE_MULTIPLIER}),
+    {ok, new}.
+
+
+current_msecs() ->
+    {A,B,C} = os:timestamp(),
+    ((A * 1000000) + B * 1000) + C div 1000.
+

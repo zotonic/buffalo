@@ -35,7 +35,15 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(timeout, {Module, Function, Args}) ->
-    ok = erlang:apply(Module, Function, Args),
+    case erlang:apply(Module, Function, Args) of
+        ok ->
+            ok;
+        {ok, _} -> 
+            ok;
+        Other ->
+            lager:warning("[buffalo] call to ~p:~p returned ~p. Args were: ~p", 
+                          [Module, Function, Other, Args])
+    end,
     {stop, normal, undefined};
 
 handle_info(_Info, State) ->

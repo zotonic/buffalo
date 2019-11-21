@@ -3,6 +3,8 @@
 
 -behaviour(supervisor).
 
+-include("../include/buffalo.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -24,7 +26,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    ets:new(buffalo, [named_table, public]),
+    ets:new(buffalo, [set, named_table, public, {keypos, #buffalo_entry.key}]),
     Children = [?CHILD(buffalo_worker_sup, supervisor),
                 ?CHILD(buffalo_queuer, worker)],
     {ok, { {one_for_one, 5, 10}, Children} }.
