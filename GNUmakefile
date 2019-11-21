@@ -1,28 +1,44 @@
-.PHONY: rel stagedevrel deps test
+ERL       ?= erl
+ERLC      ?= $(ERL)c
+APP       := buffalo
+
+REBAR := ./rebar3
+REBAR_URL := https://s3.amazonaws.com/rebar3/rebar3
+
+.PHONY: compile deps xref test clean distclaen test docs
 
 all: deps compile
 
-compile:
-	rebar compile
+$(REBAR):
+	$(ERL) -noshell -s inets -s ssl \
+	  -eval '{ok, saved_to_file} = httpc:request(get, {"$(REBAR_URL)", []}, [], [{stream, "$(REBAR)"}])' \
+	  -s init stop
+	chmod +x $(REBAR)
 
-deps:
-	rebar get-deps
+compile: $(REBAR)
+	$(REBAR) compile
 
-clean:
-	rebar clean
+xref: compile
+	./rebar3 xref
 
-distclean: clean
-	rebar delete-deps
+deps: $(REBAR)
+	$(REBAR) get-deps
 
-test:
-	rebar get-deps compile
-	rebar eunit -v skip_deps=true
+clean: $(REBAR)
+	$(REBAR) clean
+
+distclean: clean $(REBAR)
+	rm -rf _build
+
+test: $(REBAR)
+	$(REBAR) get-deps compile
+	$(REBAR) eunit -v skip_deps=true
 
 ##
 ## Doc targets
 ##
-docs:
-	rebar doc
+docs: $(REBAR)
+	$(REBAR) doc
 
 APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
 	xmerl webtool snmp public_key mnesia eunit syntax_tools compiler
