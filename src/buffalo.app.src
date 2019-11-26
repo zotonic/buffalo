@@ -1,6 +1,6 @@
 {application, buffalo,
  [
-  {description, ""},
+  {description, "Buffalo - deduplicated erlang apply"},
   {vsn, "1"},
   {registered, []},
   {applications, [

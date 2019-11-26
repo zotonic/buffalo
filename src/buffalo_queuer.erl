@@ -1,12 +1,33 @@
+%% @author Arjan Scherpenisse <arjan@scherpenisse.net>
+%% @copyright 2012-2019 Arjan Scherpenisse
+%% @doc Buffalo queuer: buffers, deduplicates, and starts workers
+
+%% Copyright 2012-2019 Arjan Scherpenisse
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+
 -module(buffalo_queuer).
 -behaviour(gen_server).
+
+-include("../include/buffalo.hrl").
+
 -define(SERVER, ?MODULE).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0, queue/4, queue/5, cancel/1, cancel/3]).
+-export([start_link/0, queue/2, queue/3, cancel_key/1, cancel_mfa/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -22,17 +43,17 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-cancel(Key) ->
+cancel_key(Key) ->
     gen_server:call(?SERVER, {cancel, Key}).
 
-cancel(Module, Function, Arguments) ->
-    cancel(key(Module, Function, Arguments)).
+cancel_mfa(MFA) ->
+    cancel_key(key(MFA)).
 
-queue(Module, Function, Arguments, Timeout) ->
-    queue(key(Module, Function, Arguments), Module, Function, Arguments, Timeout).
+queue(MFA, Options) ->
+    queue(key(MFA), MFA, Options).
 
-queue(Key, Module, Function, Arguments, Timeout) ->
-    gen_server:call(?SERVER, {queue, Key, {Module, Function, Arguments}, Timeout}).
+queue(Key, MFA, Options) ->
+    gen_server:call(?SERVER, {queue, Key, MFA, Options}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -43,7 +64,7 @@ init(_Args) ->
 
 handle_call({cancel, Key}, _From, State) ->
     Ret = case ets:lookup(buffalo, Key) of
-              [{Key, _MFA, OldRef}] ->
+              [#buffalo_entry{key=Key, timer=OldRef}] ->
                   erlang:cancel_timer(OldRef),
                   ets:delete(buffalo, Key),
                   ok;
@@ -52,25 +73,15 @@ handle_call({cancel, Key}, _From, State) ->
           end,
     {reply, Ret, State};
 
-handle_call({queue, Key, MFA, Timeout}, _From, State) ->
-    Ret = case ets:lookup(buffalo, Key) of
-              [{Key, _OldMFA, OldRef}] ->
-                  erlang:cancel_timer(OldRef),
-                  ets:delete(buffalo, Key),
-                  existing;
-              [] ->
-                  new
-          end,
-    Ref = erlang:send_after(Timeout, self(), {timeout, Key, MFA}),
-    ets:insert(buffalo, {Key, MFA, Ref}),
+handle_call({queue, Key, MFA, Options}, _From, State) ->
+    {ok, Ret} = add_mfa(Key, MFA, Options),
     {reply, {ok, Ret}, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({timeout, Key, MFA}, State) ->
-    {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
-    ets:delete(buffalo, Key),
+handle_info({timeout, Key}, State) ->
+    ok = start_key(Key),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -83,5 +94,54 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-key(M, F, A) ->
-    {M, F, A}.
+key({_M, _F, _A} = MFA) ->
+    MFA.
+
+start_key(Key) ->
+    case ets:lookup(buffalo, Key) of
+        [] ->
+            ok;
+        [#buffalo_entry{mfa=MFA}] ->
+            start_mfa(MFA),
+            ets:delete(buffalo, Key),
+            ok
+    end.
+
+start_mfa(MFA) ->
+    {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]).
+
+
+add_mfa(Key, MFA, Options) ->
+    add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options).
+
+
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline}], Now, Key, MFA, _Options) when Deadline =< Now ->
+    erlang:cancel_timer(OldRef),
+    start_mfa(MFA),
+    ets:delete(buffalo, Key),
+    {ok, existing};
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Options) ->
+    erlang:cancel_timer(OldRef),
+    Timeout = timeout(Options),
+    NextTimeout = erlang:min(Timeout, Deadline-Now),
+    NewRef = erlang:send_after(NextTimeout, self(), {timeout, Key}),
+    ets:insert(buffalo, Entry#buffalo_entry{timer=NewRef, mfa=MFA}),
+    {ok, existing};
+add_mfa_1([], Now, Key, MFA, Options) ->
+    Timeout = timeout(Options),
+    Deadline = deadline(Options),
+    NewRef = erlang:send_after(Timeout, self(), {timeout, Key}),
+    ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Deadline}),
+    {ok, new}.
+
+timeout(#{ timeout := Timeout }) -> Timeout;
+timeout(_Options) -> ?DEFAULT_TIMEOUT.
+
+deadline(#{ deadline := Deadline }) -> Deadline;
+deadline(Options) -> timeout(Options) * ?DEADLINE_MULTIPLIER.
+
+
+current_msecs() ->
+    {A,B,C} = os:timestamp(),
+    ((A * 1000000) + B * 1000) + C div 1000.
+

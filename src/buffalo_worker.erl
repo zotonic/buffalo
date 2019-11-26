@@ -1,3 +1,21 @@
+%% @author Arjan Scherpenisse <arjan@scherpenisse.net>
+%% @copyright 2012-2019 Arjan Scherpenisse
+%% @doc Buffalo worker, executes a buffered task
+
+%% Copyright 2012-2019 Arjan Scherpenisse
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+
 -module(buffalo_worker).
 -behaviour(gen_server).
 
@@ -35,7 +53,15 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(timeout, {Module, Function, Args}) ->
-    ok = erlang:apply(Module, Function, Args),
+    case erlang:apply(Module, Function, Args) of
+        ok ->
+            ok;
+        {ok, _} -> 
+            ok;
+        Other ->
+            lager:warning("[buffalo] call to ~p:~p returned ~p. Args were: ~p", 
+                          [Module, Function, Other, Args])
+    end,
     {stop, normal, undefined};
 
 handle_info(_Info, State) ->

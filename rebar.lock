@@ -1,0 +1,8 @@
+{"1.1.0",
+[{<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.6.10">>},0}]}.
+[
+{pkg_hash,[
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"lager">>, <<"6172B43AB720AC33914CCD0AEB21FDBDF88213847707D4B91E6AF57B2AE5C4D2">>}]}
+].
