@@ -1,7 +1,7 @@
 {application, buffalo,
  [
   {description, "Buffalo - deduplicated erlang apply"},
-  {vsn, "1"},
+  {vsn, "git"},
   {registered, []},
   {applications, [
                   kernel,
