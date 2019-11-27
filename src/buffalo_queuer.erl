@@ -43,15 +43,19 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+-spec cancel_key( buffalo:key() ) -> ok | {error, notfound}.
 cancel_key(Key) ->
     gen_server:call(?SERVER, {cancel, Key}).
 
+-spec cancel_mfa( buffalo:mfargs() ) -> ok | {error, notfound}.
 cancel_mfa(MFA) ->
     cancel_key(key(MFA)).
 
+-spec queue( buffalo:mfargs(), buffalo:options() ) -> {ok, new | existing}.
 queue(MFA, Options) ->
     queue(key(MFA), MFA, Options).
 
+-spec queue( buffalo:key(), buffalo:mfargs(), buffalo:options() ) -> {ok, new | existing}.
 queue(Key, MFA, Options) ->
     gen_server:call(?SERVER, {queue, Key, MFA, Options}).
 

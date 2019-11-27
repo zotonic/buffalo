@@ -40,22 +40,24 @@
 
 -type key() :: term().
 
--export_type([options/0, key/0]).
+-type mfargs() :: {atom(), atom(), list()}.
+
+-export_type([ options/0, key/0, mfargs/0 ]).
 
 %% API
 
 start() ->
     application:start(buffalo).
 
--spec queue( mfa(), options() ) -> {ok, existing | new}.
+-spec queue( mfargs(), options() ) -> {ok, existing | new}.
 queue(MFA, Opts) ->
     buffalo_queuer:queue(MFA, Opts).
 
--spec queue( key(), mfa(), options() ) -> {ok, existing | new}.
+-spec queue( key(), mfargs(), options() ) -> {ok, existing | new}.
 queue(Key, MFA, Opts) ->
     buffalo_queuer:queue(Key, MFA, Opts).
 
--spec cancel( mfa() | key() ) -> ok | {error, notfound}.
+-spec cancel( mfargs() | key() ) -> ok | {error, notfound}.
 cancel({Module, Function, Arguments} = MFA) when is_atom(Module), is_atom(Function), is_list(Arguments) ->
     buffalo_queuer:cancel_mfa(MFA);
 cancel(Key) ->
