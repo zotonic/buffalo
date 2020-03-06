@@ -27,7 +27,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0, queue/2, queue/3, cancel_key/1, cancel_mfa/1]).
+-export([start_link/0, queue/2, queue/3, cancel_key/1, cancel_mfa/1, status/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -64,6 +64,10 @@ queue(MFA, Options) ->
 queue(Key, MFA, Options) ->
     gen_server:call(?SERVER, {queue, Key, MFA, Options}).
 
+-spec status( buffalo:key() ) -> {ok, queued | running} | {error, notfound}.
+status(Key) ->
+    gen_server:call(?SERVER, {status, Key}).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -96,6 +100,18 @@ handle_call({queue, Key, MFA, #{ is_drop_running := true } = Options}, _From, St
 
 handle_call({queue, Key, MFA, Options}, _From, State) ->
     Ret = add_mfa(Key, MFA, Options),
+    {reply, Ret, State};
+
+handle_call({status, Key}, _From, #state{ key_to_pid = KeyToPid } = State) ->
+    Ret = case ets:lookup(buffalo, Key) of
+        [ #buffalo_entry{} ] ->
+                    {ok, queued};
+        [] ->
+            case maps:is_key(Key, KeyToPid) of
+                true -> {ok, running};
+                false -> {error, notfound}
+            end
+    end,
     {reply, Ret, State}.
 
 handle_cast(_Msg, State) ->

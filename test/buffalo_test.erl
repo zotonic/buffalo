@@ -73,21 +73,24 @@ test_update() ->
 test_deadline() ->
     Unit = 100,
     Msg = ping,
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    MFA = {?MODULE, send, [self(), Msg]},
+    Key = test_deadline,
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
+    {ok, queued} = buffalo:status(Key),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.5*Unit)),
-    buffalo:queue({?MODULE, send, [self(), Msg]}, #{ timeout => Unit }),
+    buffalo:queue(Key, MFA, #{ timeout => Unit }),
     % We are now at 4.7 x initial unit
     % The deadline (at 5x) should trigger soon.
     Msg = do_receive(Msg, trunc(0.4*Unit)),
@@ -96,19 +99,23 @@ test_deadline() ->
 
 test_drop_if_running() ->
     Sleep = 100,
-    {ok, new} = buffalo:queue({?MODULE, send_sleep, [self(), Sleep]}, #{ timeout => 0 }),
+    Key = test_drop_if_running,
+    MFA = {?MODULE, send_sleep, [self(), Sleep]},
+    {ok, new} = buffalo:queue(Key, MFA, #{ timeout => 0 }),
     ok = receive
         start -> ok
     after
         20 -> timeout
     end,
-    {ok, running} = buffalo:queue({?MODULE, send_sleep, [self(), Sleep]}, #{ is_drop_running => true, timeout => 0 }),
+    {ok, running} = buffalo:status(Key),
+    {ok, running} = buffalo:queue(Key, MFA, #{ is_drop_running => true, timeout => 0 }),
     ok = receive
         stop -> ok
     after
         200 -> timeout
     end,
-    {ok, new} = buffalo:queue({?MODULE, send_sleep, [self(), Sleep]}, #{ timeout => 0 }),
+    {error, notfound} = buffalo:status(Key),
+    {ok, new} = buffalo:queue(Key, MFA, #{ timeout => 0 }),
     ok = receive
         start -> ok
     after

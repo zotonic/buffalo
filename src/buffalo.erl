@@ -21,7 +21,8 @@
 -export([
     start/0,
     queue/2, queue/3,
-    cancel/1
+    cancel/1,
+    status/1
 ]).
 
 -deprecated([{queue,4,eventually}]).
@@ -63,6 +64,11 @@ cancel({Module, Function, Arguments} = MFA) when is_atom(Module), is_atom(Functi
     buffalo_queuer:cancel_mfa(MFA);
 cancel(Key) ->
     buffalo_queuer:cancel_key(Key).
+
+%% @doc Check if the task with the specified key is running or queued.
+-spec status( key() ) -> {ok, queued | running} | {error, notfound}.
+status(Key) ->
+    buffalo_queuer:status(Key).
 
 
 %% @doc Deprecated API
