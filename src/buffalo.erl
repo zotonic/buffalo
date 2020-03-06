@@ -35,7 +35,8 @@
 
 -type options() :: #{
         timeout => pos_integer(),
-        deadline => pos_integer()
+        deadline => pos_integer(),
+        is_drop_running => boolean()
     }.
 
 -type key() :: term().
@@ -49,11 +50,11 @@
 start() ->
     application:start(buffalo).
 
--spec queue( mfargs(), options() ) -> {ok, existing | new}.
+-spec queue( mfargs(), options() ) -> {ok, existing | new | running}.
 queue(MFA, Opts) ->
     buffalo_queuer:queue(MFA, Opts).
 
--spec queue( key(), mfargs(), options() ) -> {ok, existing | new}.
+-spec queue( key(), mfargs(), options() ) -> {ok, existing | new | running}.
 queue(Key, MFA, Opts) ->
     buffalo_queuer:queue(Key, MFA, Opts).
 

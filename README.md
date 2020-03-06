@@ -29,6 +29,17 @@ A specific deadline can be specified:
 
     buffalo:queue({Module, Function, Args}, #{ timeout => 100, deadline => 250 }).
 
+Drop If Running
+---------------
+
+Normally entries are dedepulicated when they are queued. With the option `is_drop_running`
+the task is also not added if the task is already running.
+
+Example:
+
+    buffalo:queue({Module, Function, Args}, #{ is_drop_running => true }).
+
+
 Unique Key
 ----------
 

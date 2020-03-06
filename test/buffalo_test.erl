@@ -22,7 +22,8 @@
 
 %% API
 -export([
-    send/2
+    send/2,
+    send_sleep/2
     ]).
 
 %% tests
@@ -34,6 +35,7 @@ all_test_() ->
       , {timeout, 100, fun test_update/0}
       , {timeout, 100, fun test_deadline/0}
       , {timeout, 100, fun test_cancel/0}
+      , {timeout, 100, fun test_drop_if_running/0}
       ]}.
 
 setup() ->
@@ -92,6 +94,33 @@ test_deadline() ->
     % And the queue should be emptied.
     ok = dont_receive(trunc(1.2*Unit)).
 
+test_drop_if_running() ->
+    Sleep = 100,
+    {ok, new} = buffalo:queue({?MODULE, send_sleep, [self(), Sleep]}, #{ timeout => 0 }),
+    ok = receive
+        start -> ok
+    after
+        20 -> timeout
+    end,
+    {ok, running} = buffalo:queue({?MODULE, send_sleep, [self(), Sleep]}, #{ is_drop_running => true, timeout => 0 }),
+    ok = receive
+        stop -> ok
+    after
+        200 -> timeout
+    end,
+    {ok, new} = buffalo:queue({?MODULE, send_sleep, [self(), Sleep]}, #{ timeout => 0 }),
+    ok = receive
+        start -> ok
+    after
+        20 -> timeout
+    end,
+    ok = receive
+        stop -> ok
+    after
+        200 -> timeout
+    end,
+    ok.
+
 dont_receive(T) ->
     receive
         Msg ->
@@ -110,5 +139,11 @@ do_receive(What, After) ->
 
 send(Pid, Msg) ->
     Pid ! Msg,
+    ok.
+
+send_sleep(Pid, Sleep) ->
+    Pid ! start,
+    timer:sleep(Sleep),
+    Pid ! stop,
     ok.
 

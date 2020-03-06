@@ -36,6 +36,11 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-record(state, {
+    pid_to_key = #{} :: #{ pid() := buffalo:mfargs() },
+    key_to_pid = #{} :: #{ buffalo:mfargs() := pid() }
+}).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -64,7 +69,10 @@ queue(Key, MFA, Options) ->
 %% ------------------------------------------------------------------
 
 init(_Args) ->
-    {ok, []}.
+    {ok, #state{
+        key_to_pid = #{},
+        pid_to_key = #{}
+    }}.
 
 handle_call({cancel, Key}, _From, State) ->
     Ret = case ets:lookup(buffalo, Key) of
@@ -77,16 +85,40 @@ handle_call({cancel, Key}, _From, State) ->
           end,
     {reply, Ret, State};
 
+handle_call({queue, Key, MFA, #{ is_drop_running := true } = Options}, _From, State) ->
+    Ret = case maps:is_key(Key, State#state.key_to_pid) of
+        true ->
+            {ok, running};
+        false ->
+            add_mfa(Key, MFA, Options)
+    end,
+    {reply, Ret, State};
+
 handle_call({queue, Key, MFA, Options}, _From, State) ->
-    {ok, Ret} = add_mfa(Key, MFA, Options),
-    {reply, {ok, Ret}, State}.
+    Ret = add_mfa(Key, MFA, Options),
+    {reply, Ret, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({timeout, Key}, State) ->
-    ok = start_key(Key),
-    {noreply, State}.
+handle_info({'DOWN', _Ref, process, Pid, _ExitStatus}, State) ->
+    case maps:get(Pid, State#state.pid_to_key, undefined) of
+        undefined ->
+            {noreply, State};
+        Key ->
+            PidToKey1 = maps:remove(Pid, State#state.pid_to_key),
+            KeyToPid1 = maps:remove(Key, State#state.key_to_pid),
+            {noreply, State#state{ pid_to_key = PidToKey1, key_to_pid = KeyToPid1 }}
+    end;
+
+handle_info({timeout, Key}, #state{ pid_to_key = PidToKey, key_to_pid = KeyToPid } = State) ->
+    {ok, Pid} = start_key(Key),
+    erlang:monitor(process, Pid),
+    State1 = State#state{
+        pid_to_key = PidToKey#{ Pid => Key },
+        key_to_pid = KeyToPid#{ Key => Pid }
+    },
+    {noreply, State1}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -104,30 +136,20 @@ key({_M, _F, _A} = MFA) ->
 start_key(Key) ->
     case ets:lookup(buffalo, Key) of
         [] ->
-            ok;
-        [#buffalo_entry{mfa=MFA}] ->
-            start_mfa(MFA),
+            {error, notfound};
+        [ #buffalo_entry{mfa=MFA} ] ->
+            {ok, Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
             ets:delete(buffalo, Key),
-            ok
+            {ok, Pid}
     end.
-
-start_mfa(MFA) ->
-    {ok, _Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]).
-
 
 add_mfa(Key, MFA, Options) ->
     add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options).
 
-
-add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline}], Now, Key, MFA, _Options) when Deadline =< Now ->
-    erlang:cancel_timer(OldRef),
-    start_mfa(MFA),
-    ets:delete(buffalo, Key),
-    {ok, existing};
 add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Options) ->
     erlang:cancel_timer(OldRef),
     Timeout = timeout(Options),
-    NextTimeout = erlang:min(Timeout, Deadline-Now),
+    NextTimeout = erlang:max( 0, erlang:min(Timeout, Deadline-Now) ),
     NewRef = erlang:send_after(NextTimeout, self(), {timeout, Key}),
     ets:insert(buffalo, Entry#buffalo_entry{timer=NewRef, mfa=MFA}),
     {ok, existing};
@@ -138,7 +160,7 @@ add_mfa_1([], Now, Key, MFA, Options) ->
     ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Deadline}),
     {ok, new}.
 
-timeout(#{ timeout := Timeout }) -> Timeout;
+timeout(#{ timeout := Timeout }) -> erlang:max(0, Timeout);
 timeout(_Options) -> ?DEFAULT_TIMEOUT.
 
 deadline(#{ deadline := Deadline }) -> Deadline;
