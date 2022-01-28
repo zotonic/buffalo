@@ -1,8 +1,8 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2012-2019 Arjan Scherpenisse
+%% @copyright 2012-2022 Arjan Scherpenisse
 %% @doc Buffalo worker, executes a buffered task
 
-%% Copyright 2012-2019 Arjan Scherpenisse
+%% Copyright 2012-2022 Arjan Scherpenisse
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -32,6 +32,9 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+
+-include_lib("kernel/include/logger.hrl").
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -56,11 +59,11 @@ handle_info(timeout, {Module, Function, Args}) ->
     case erlang:apply(Module, Function, Args) of
         ok ->
             ok;
-        {ok, _} -> 
+        {ok, _} ->
             ok;
         Other ->
-            lager:warning("[buffalo] call to ~p:~p returned ~p. Args were: ~p", 
-                          [Module, Function, Other, Args])
+            ?LOG_WARNING("[buffalo] call to ~p:~p returned ~p. Args were: ~p",
+                         [Module, Function, Other, Args])
     end,
     {stop, normal, undefined};
 
