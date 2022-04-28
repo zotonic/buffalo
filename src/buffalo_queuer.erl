@@ -1,6 +1,8 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
 %% @copyright 2012-2019 Arjan Scherpenisse
-%% @doc Buffalo queuer: buffers, deduplicates, and starts workers
+%% @doc Buffalo queuer: buffers, deduplicates, and starts workers<br/>
+%% Implementation of `gen_server' behaviour.
+%% @end
 
 %% Copyright 2012-2019 Arjan Scherpenisse
 %%
@@ -41,30 +43,76 @@
     key_to_pid = #{} :: #{ buffalo:mfargs() := pid() }
 }).
 
+
+-type state() :: #state{
+						pid_to_key :: #{ pid() := buffalo:mfargs() },
+						key_to_pid :: #{ buffalo:mfargs() := pid() }
+					}.
+					
+%% @private
+-type buffalo_entry() :: #buffalo_entry{
+							key :: buffalo:key(),
+							mfa :: buffalo:mfargs(),
+							timer :: reference(), 
+							deadline :: non_neg_integer()
+						}.
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
+%% @doc Creates a `gen_server' process as part of a supervision tree.
+
+-spec start_link() -> Result when
+	Result :: {ok,Pid} | ignore | {error,Error},
+	Pid :: pid(),
+	Error :: {already_started,Pid} | term().
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec cancel_key( buffalo:key() ) -> ok | {error, notfound}.
+%% @doc Cancel the MFA running using specified `Key'.
+
+-spec cancel_key(Key) -> Result when
+	Key :: buffalo:key(),
+	Result :: ok | {error, notfound}.
 cancel_key(Key) ->
     gen_server:call(?SERVER, {cancel, Key}).
 
--spec cancel_mfa( buffalo:mfargs() ) -> ok | {error, notfound}.
+%% @doc Cancel the MFA running.
+%% @equiv cancel_key(key(MFA))
+
+-spec cancel_mfa(MFA) -> Result when
+	MFA :: buffalo:mfargs(),
+	Result :: ok | {error, notfound}.
 cancel_mfa(MFA) ->
     cancel_key(key(MFA)).
 
--spec queue( buffalo:mfargs(), buffalo:options() ) -> {ok, new | existing}.
+%% @doc Call the MFA after specified in `Options' time.
+%% @equiv queue(key(MFA), MFA, Options)
+
+-spec queue(MFA, Options) -> Result when
+	MFA :: buffalo:mfargs(), 
+	Options :: buffalo:options(),
+	Result :: {ok, new | existing}.
 queue(MFA, Options) ->
     queue(key(MFA), MFA, Options).
 
--spec queue( buffalo:key(), buffalo:mfargs(), buffalo:options() ) -> {ok, new | existing}.
+%% @doc Call the MFA after specified in `Options' time 
+%%	using specified `Key'.
+
+-spec queue(Key, MFA, Options) -> Result when
+	Key :: buffalo:key(), 
+	MFA :: buffalo:mfargs(), 
+	Options :: buffalo:options(),
+	Result :: {ok, new | existing}.
 queue(Key, MFA, Options) ->
     gen_server:call(?SERVER, {queue, Key, MFA, Options}).
 
--spec status( buffalo:key() ) -> {ok, queued | running} | {error, notfound}.
+%% @doc Check if the task with the specified key is running or queued.
+
+-spec status(Key) -> Result when
+	Key :: buffalo:key(),
+	Result :: {ok, queued | running} | {error, notfound}.
 status(Key) ->
     gen_server:call(?SERVER, {status, Key}).
 
@@ -72,12 +120,42 @@ status(Key) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
+%% @private
+
+-spec init(Args) -> Result when 
+	Args :: list(),
+	Result :: {ok, state()}.
 init(_Args) ->
     {ok, #state{
         key_to_pid = #{},
         pid_to_key = #{}
     }}.
 
+%% @private
+
+-spec handle_call(Request, From, State) -> Result when 
+	Request :: {cancel, Key},
+	Key :: buffalo:key(),
+	From :: {pid(), atom()},
+    State :: state(),
+	Result :: {reply, Reply, State},
+	Reply :: ok | {error, notfound};
+(Request, From, State) -> Result when 
+	Request :: {queue, Key, MFA, Options},
+	Key :: buffalo:key(),
+	MFA :: buffalo:mfargs(),
+	Options :: buffalo:options(),
+	From :: {pid(), atom()},
+    State :: state(),
+	Result :: {reply, Reply, State},
+	Reply :: {ok, running} | {ok, existing} | {ok, new};
+(Request, From, State) -> Result when 
+	Request :: {status, Key},
+	Key :: buffalo:key(),
+	From :: {pid(), atom()},
+    State :: state(),
+	Result :: {reply, Reply, State},
+	Reply :: {ok, queued} | {ok, running} | {error, notfound}.
 handle_call({cancel, Key}, _From, State) ->
     Ret = case ets:lookup(buffalo, Key) of
               [#buffalo_entry{key=Key, timer=OldRef}] ->
@@ -114,9 +192,29 @@ handle_call({status, Key}, _From, #state{ key_to_pid = KeyToPid } = State) ->
     end,
     {reply, Ret, State}.
 
+%% @private
+
+-spec handle_cast(Request, State) -> Result when 
+	Request :: term(),
+    State :: state(),
+	Result :: {noreply, State}.
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+%% @private
+
+-spec handle_info(Info, State) -> Result when 
+    Info :: {'DOWN', Ref, process, Pid, ExitStatus},
+    State :: state(),
+	Ref :: reference(),
+	Pid :: pid(),
+	ExitStatus :: term(),
+    Result :: {noreply, State};
+(Info, State) -> Result when 
+    Info :: {timeout, Key},
+	Key :: buffalo:mfargs(),
+    State :: state(),
+    Result :: {noreply, State}.
 handle_info({'DOWN', _Ref, process, Pid, _ExitStatus}, State) ->
     case maps:get(Pid, State#state.pid_to_key, undefined) of
         undefined ->
@@ -136,9 +234,22 @@ handle_info({timeout, Key}, #state{ pid_to_key = PidToKey, key_to_pid = KeyToPid
     },
     {noreply, State1}.
 
+%% @private
+
+-spec terminate(Reason, State) -> Result when
+    Reason :: normal | shutdown | {shutdown, term()} | term(),
+    State :: state(),
+    Result :: ok.
 terminate(_Reason, _State) ->
     ok.
 
+%% @private
+
+-spec code_change(OldVersion, State, Extra) -> Result when
+	OldVersion :: (term() | {down, term()}),
+	State :: state(),
+	Extra :: term(),
+	Result :: {ok, State}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -146,9 +257,15 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec key(buffalo:mfargs()) -> Result when
+	Result :: buffalo:mfargs().
 key({_M, _F, _A} = MFA) ->
     MFA.
 
+-spec start_key(Key) -> Result when
+	Key :: buffalo:mfargs(),
+	Result :: {error, notfound} | {ok, Pid},
+	Pid :: pid().
 start_key(Key) ->
     case ets:lookup(buffalo, Key) of
         [] ->
@@ -159,9 +276,23 @@ start_key(Key) ->
             {ok, Pid}
     end.
 
+%% @equiv add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options)
+
+-spec add_mfa(Key, MFA, Options) -> Result when
+	Key :: buffalo:key(),
+	MFA :: buffalo:mfargs(),
+	Options :: buffalo:options(),
+	Result :: {ok, existing} | {ok, new}.
 add_mfa(Key, MFA, Options) ->
     add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options).
 
+-spec add_mfa_1(BuffaloEntryList, Now, Key, MFA, Options) -> Result when
+	BuffaloEntryList :: [] | [buffalo_entry()], 
+	Now :: non_neg_integer(), 
+	Key :: buffalo:key(),
+	MFA :: buffalo:mfargs(),
+	Options :: buffalo:options(),
+	Result :: {ok, existing} | {ok, new}.
 add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Options) ->
     erlang:cancel_timer(OldRef),
     Timeout = timeout(Options),
@@ -176,13 +307,20 @@ add_mfa_1([], Now, Key, MFA, Options) ->
     ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Deadline}),
     {ok, new}.
 
+-spec timeout(Options) -> Result when
+	Options :: buffalo:options(),
+	Result :: non_neg_integer().
 timeout(#{ timeout := Timeout }) -> erlang:max(0, Timeout);
 timeout(_Options) -> ?DEFAULT_TIMEOUT.
 
+-spec deadline(Options) -> Result when
+	Options :: buffalo:options(),
+	Result :: non_neg_integer().
 deadline(#{ deadline := Deadline }) -> Deadline;
 deadline(Options) -> timeout(Options) * ?DEADLINE_MULTIPLIER.
 
-
+-spec current_msecs() -> Result when
+	Result :: non_neg_integer().
 current_msecs() ->
     {A,B,C} = os:timestamp(),
     ((A * 1000000) + B * 1000) + C div 1000.

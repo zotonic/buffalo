@@ -1,0 +1,5 @@
+@author Zotonic Team
+@title buffalo
+@doc An Erlang app for delayed process execution.
+@copyright Apache 2.0
+

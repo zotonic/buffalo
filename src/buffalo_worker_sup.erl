@@ -1,6 +1,8 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
 %% @copyright 2012-2019 Arjan Scherpenisse
-%% @doc Buffalo supervisor for task workers
+%% @doc Buffalo supervisor for task workers<br/>
+%% Implementation of `supervisor' behaviour.
+%% @end
 
 %% Copyright 2012-2019 Arjan Scherpenisse
 %%
@@ -33,6 +35,9 @@
 %% API functions
 %% ===================================================================
 
+-spec start_link() -> Result when
+	Result :: {ok, pid()} | ignore | {error, StartlinkError},
+	StartlinkError :: {already_started, pid()} | {shutdown, term()} | term().
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
@@ -40,6 +45,19 @@ start_link() ->
 %% Supervisor callbacks
 %% ===================================================================
 
+%% @private
+
+-spec init(Args) -> Result when 
+	Args :: [],
+	Result :: {ok,{SupFlags, ChildSpec}} | ignore,
+	SupFlags :: {simple_one_for_one, 0, 1},
+	ChildSpec :: [Worker],
+	Worker :: {buffalo_worker,
+              {buffalo_worker, start_link, []},
+              temporary,
+              2000,
+              worker,
+              [buffalo_worker]}.
 init([]) ->
     Worker = {buffalo_worker,
               {buffalo_worker, start_link, []},

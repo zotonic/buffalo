@@ -1,6 +1,9 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
 %% @copyright 2012-2019 Arjan Scherpenisse
-%% @doc Buffalo application
+%% @doc Buffalo application<br/>
+%  Implementation of `application' behaviour.
+%% @private
+%% @end
 
 %% Copyright 2012-2019 Arjan Scherpenisse
 %%
@@ -26,9 +29,16 @@
 %% ===================================================================
 %% Application callbacks
 %% ===================================================================
-
+-spec start(StartType, StartArgs) -> Result when
+	StartType :: application:start_type(), 
+	StartArgs :: term(),
+	Result :: {ok, pid()} | {error, Reason},
+	Reason :: term().
 start(_StartType, _StartArgs) ->
     buffalo_sup:start_link().
 
+-spec stop(State) -> Result when
+	State :: term(),
+	Result :: ok.
 stop(_State) ->
     ok.

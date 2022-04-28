@@ -48,40 +48,80 @@
 
 %% API
 
+%% @doc Start application `buffalo'.
+
+-spec start() -> Result when
+	Result :: ok | {error, Reason},
+	Reason :: term().
 start() ->
     application:start(buffalo).
 
--spec queue( mfargs(), options() ) -> {ok, existing | new | running}.
+%% @doc Call the MFA after specified in `Options' time.
+
+-spec queue(MFA, Opts) -> Result when
+	MFA :: mfargs(),
+	Opts :: options(),
+	Result :: {ok, existing | new | running}.
 queue(MFA, Opts) ->
     buffalo_queuer:queue(MFA, Opts).
 
--spec queue( key(), mfargs(), options() ) -> {ok, existing | new | running}.
+%% @doc Call the MFA after specified in `Options' time 
+%%	using specified `Key'.
+
+-spec queue(Key, MFA, Opts) -> Result when
+	Key :: key(), 
+	MFA :: mfargs(), 
+	Opts :: options(),
+	Result :: {ok, existing | new | running}.
 queue(Key, MFA, Opts) ->
     buffalo_queuer:queue(Key, MFA, Opts).
 
--spec cancel( mfargs() | key() ) -> ok | {error, notfound}.
+%% @doc Cancel the MFA running.
+-spec cancel(Key) -> Result when
+	Key :: mfargs() | key(),
+	Result :: ok | {error, notfound}.
 cancel({Module, Function, Arguments} = MFA) when is_atom(Module), is_atom(Function), is_list(Arguments) ->
     buffalo_queuer:cancel_mfa(MFA);
 cancel(Key) ->
     buffalo_queuer:cancel_key(Key).
 
 %% @doc Check if the task with the specified key is running or queued.
--spec status( key() ) -> {ok, queued | running} | {error, notfound}.
+
+-spec status(Key) -> Result when
+	Key :: key(),
+	Result :: {ok, queued | running} | {error, notfound}.
 status(Key) ->
     buffalo_queuer:status(Key).
 
+%% @deprecated Deprecated API
 
-%% @doc Deprecated API
--spec queue( atom(), atom(), list(), pos_integer() ) -> {ok, existing | new}.
+-spec queue(Module, Function, Arguments, Timeout) -> Result when
+	Module :: atom(), 
+	Function :: atom(), 
+	Arguments :: list(), 
+	Timeout :: pos_integer(),
+	Result :: {ok, existing | new}.
 queue(Module, Function, Arguments, Timeout) when is_integer(Timeout) ->
     buffalo_queuer:queue({Module, Function, Arguments}, #{ timeout => Timeout }).
 
-%% @doc Deprecated API
--spec queue( key(), atom(), atom(), list(), pos_integer() ) -> {ok, existing | new}.
+%% @deprecated Deprecated API
+
+-spec queue(Key, Module, Function, Arguments, Timeout) -> Result when
+	Key :: key(), 
+	Module :: atom(), 
+	Function :: atom(), 
+	Arguments :: list(), 
+	Timeout :: pos_integer(),
+	Result :: {ok, existing | new}.
 queue(Key, Module, Function, Arguments, Timeout) when is_integer(Timeout) ->
     buffalo_queuer:queue(Key, {Module, Function, Arguments}, #{ timeout => Timeout }).
 
-%% @doc Deprecated API
--spec cancel(atom(), atom(), list()) -> ok | {error, notfound}.
+%% @deprecated Deprecated API
+
+-spec cancel(Module, Function, Arguments) -> Result when 
+	Module :: atom(), 
+	Function :: atom(), 
+	Arguments :: list(),
+	Result :: ok | {error, notfound}.
 cancel(Module, Function, Arguments) ->
     buffalo_queuer:cancel_mfa({Module, Function, Arguments}).
