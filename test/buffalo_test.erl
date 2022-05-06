@@ -89,7 +89,7 @@ test_deadline() ->
 	buffalo:queue(Key, MFA, #{ timeout => Unit }),
     ok = dont_receive(trunc(0.7*Unit)),
 	buffalo:queue(Key, MFA, #{ timeout => Unit }),
-    ok = dont_receive(trunc(0.2*Unit)),
+    ok = dont_receive(trunc(0.5*Unit)),
 	buffalo:queue(Key, MFA, #{ timeout => Unit }),
     % We are now at 4.7 x initial unit
     % The deadline (at 5x) should trigger soon.
