@@ -80,37 +80,41 @@ prop_update() ->
 %     ).
 
 prop_deadline() ->
-    ?SETUP(setup(),
-    ?FORALL(Unit, range(100,100),
-    begin
-		Msg = ping,
-		MFA = {?MODULE, send, [self(), Msg]},
-		Key = test_deadline,
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		{ok, queued} = buffalo:status(Key),
-		ok = dont_receive(trunc(0.7*Unit)),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		ok = dont_receive(trunc(0.7*Unit)),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		ok = dont_receive(trunc(0.7*Unit)),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		ok = dont_receive(trunc(0.7*Unit)),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		ok = dont_receive(trunc(0.7*Unit)),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		ok = dont_receive(trunc(0.7*Unit)),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		ok = dont_receive(trunc(0.2*Unit)),
-		%Result = dont_receive(trunc(0.2*Unit)),
-		%io:format("Result = ~p~n",[Result]),
-		buffalo:queue(Key, MFA, #{ timeout => Unit }),
-		% We are now at 4.7 x initial unit
-		% The deadline (at 5x) should trigger soon.
-		Msg = do_receive(Msg, trunc(0.4*Unit)),
-		% And the queue should be emptied.
-		ok == dont_receive(trunc(1.2*Unit))
-    end)
-    ).
+			?FORALL(Unit, range(100,100),
+			begin
+				ok = application:start(buffalo),
+				
+				Msg = ping,
+				MFA = {?MODULE, send, [self(), Msg]},
+				Key = test_deadline,
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				{ok, queued} = buffalo:status(Key),
+				ok = dont_receive(trunc(0.7*Unit)),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				ok = dont_receive(trunc(0.7*Unit)),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				ok = dont_receive(trunc(0.7*Unit)),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				ok = dont_receive(trunc(0.7*Unit)),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				ok = dont_receive(trunc(0.7*Unit)),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				ok = dont_receive(trunc(0.7*Unit)),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				ok = dont_receive(trunc(0.2*Unit)),
+				%Result = dont_receive(trunc(0.2*Unit)),
+				%io:format("Result = ~p~n",[Result]),
+				buffalo:queue(Key, MFA, #{ timeout => Unit }),
+				% We are now at 4.7 x initial unit
+				% The deadline (at 5x) should trigger soon.
+				Msg = do_receive(Msg, trunc(0.4*Unit)),
+				% And the queue should be emptied.
+				ok = dont_receive(trunc(1.3*Unit)),
+				
+				application:stop(buffalo),
+				application:unload(buffalo),
+				true
+			end).
 
 
 %%%%%%%%%%%%%%%
