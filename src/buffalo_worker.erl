@@ -1,6 +1,8 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
 %% @copyright 2012-2022 Arjan Scherpenisse
-%% @doc Buffalo worker, executes a buffered task
+%% @doc Buffalo worker, executes a buffered task<br/>
+%% Implementation of `gen_server' behaviour.
+%% @end
 
 %% Copyright 2012-2022 Arjan Scherpenisse
 %%
@@ -35,6 +37,9 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+-type mfargs() :: buffalo:mfargs().
+-type state() :: mfargs().
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -46,15 +51,39 @@ start_link(Args) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
+%% @private
+
+-spec init(MFA) -> Result when 
+	MFA :: mfargs(),
+	Result :: {ok, MFA, 0}.
 init(MFA) ->
     {ok, MFA, 0}.
 
+%% @private
+
+-spec handle_call(Request, From, State) -> Result when 
+	Request :: term(),
+	From :: {pid(), atom()},
+    State :: state(),
+	Result :: {reply, ok, State}.
 handle_call(_Call, _From, State) ->
     {reply, ok, State}.
 
+%% @private
+
+-spec handle_cast(Request, State) -> Result when 
+	Request :: term(),
+    State :: state(),
+	Result :: {noreply, State}.
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+%% @private
+
+-spec handle_info(Info, State) -> Result when 
+	Info ::  timeout | term(),
+	State :: state(),
+	Result :: {stop, normal, undefined} | {noreply, buffalo:mfargs()}.
 handle_info(timeout, {Module, Function, Args}) ->
     case erlang:apply(Module, Function, Args) of
         ok ->
@@ -70,13 +99,21 @@ handle_info(timeout, {Module, Function, Args}) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
+%% @private
+
+-spec terminate(Reason, State) -> Result when
+    Reason :: normal | shutdown | {shutdown, term()} | term(),
+    State :: state(),
+    Result :: ok.
 terminate(_Reason, _State) ->
     ok.
 
+%% @private
+
+-spec code_change(OldVersion, State, Extra) -> Result when
+	OldVersion :: (term() | {down, term()}),
+	State :: state(),
+	Extra :: term(),
+	Result :: {ok, State}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
-

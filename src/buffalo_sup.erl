@@ -1,6 +1,7 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
 %% @copyright 2012-2019 Arjan Scherpenisse
 %% @doc Buffalo main supervisor
+%% @end
 
 %% Copyright 2012-2019 Arjan Scherpenisse
 %%
@@ -35,6 +36,9 @@
 %% API functions
 %% ===================================================================
 
+-spec start_link() -> Result when
+	Result :: {ok, pid()} | ignore | {error, StartlinkError},
+	StartlinkError :: {already_started, pid()} | {shutdown, term()} | term().
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
@@ -42,6 +46,13 @@ start_link() ->
 %% Supervisor callbacks
 %% ===================================================================
 
+%% @private
+
+-spec init(Args) -> Result when 
+	Args :: [],
+	Result :: {ok,{SupFlags, ChildSpec}} | ignore,
+	SupFlags :: {one_for_one, 5, 10},
+	ChildSpec :: [supervisor:child_spec()].
 init([]) ->
     ets:new(buffalo, [set, named_table, public, {keypos, #buffalo_entry.key}]),
     Children = [?CHILD(buffalo_worker_sup, supervisor),

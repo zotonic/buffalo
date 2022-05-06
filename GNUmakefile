@@ -32,6 +32,7 @@ clean: $(REBAR)
 
 distclean: clean $(REBAR)
 	rm -rf _build
+	rm -rf doc
 
 test: $(REBAR)
 	$(REBAR) get-deps compile
@@ -41,5 +42,6 @@ test: $(REBAR)
 ## Doc targets
 ##
 docs: $(REBAR)
-	$(REBAR) doc
+	$(REBAR) edoc
+	$(REBAR) as edoc_private edoc
 
