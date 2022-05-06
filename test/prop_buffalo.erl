@@ -79,12 +79,12 @@ prop_update() ->
 %     end)
 %     ).
 
-prop_deadline() ->
-	?FORALL(Unit, range(100,100),
-	begin
-		ok = application:start(buffalo),
+% prop_deadline() ->
+% 	?FORALL(Unit, range(100,100),
+% 	begin
+% 		ok = application:start(buffalo),
 		
-		Msg = ping,
+% 		Msg = ping,
 	% 	MFA = {?MODULE, send, [self(), Msg]},
 	% 	Key = test_deadline,
 	% 	buffalo:queue(Key, MFA, #{ timeout => Unit }),
