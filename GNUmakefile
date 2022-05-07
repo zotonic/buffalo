@@ -37,11 +37,14 @@ distclean: clean $(REBAR)
 test: $(REBAR)
 	$(REBAR) get-deps compile
 	$(REBAR) eunit -v skip_deps=true
+	$(REBAR) proper
 
 ##
 ## Doc targets
 ##
 docs: $(REBAR)
 	$(REBAR) edoc
+
+edoc_private: $(REBAR)	
 	$(REBAR) as edoc_private edoc
 

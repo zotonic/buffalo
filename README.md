@@ -48,3 +48,13 @@ to supply an identifying key instead. This makes it possible to update the MFA a
 with the key.
 
     buffalo:queue(Key, MFA, #{ timeout => 50, deadline => 400 }).
+
+## Testing
+### Testing specification
+
+```
+	$ rebar3 as test shell
+	> application:start(buffalo).
+	> proper:check_specs(buffalo).
+	> application:stop(buffalo).
+```	
