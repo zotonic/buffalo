@@ -5,7 +5,7 @@ APP       := buffalo
 REBAR := ./rebar3
 REBAR_URL := https://s3.amazonaws.com/rebar3/rebar3
 
-.PHONY: compile deps xref dialyzer test clean distclaen test docs
+.PHONY: compile deps xref dialyzer test clean distclaen test edoc
 
 all: deps compile
 
@@ -32,7 +32,6 @@ clean: $(REBAR)
 
 distclean: clean $(REBAR)
 	rm -rf _build
-	rm -rf doc
 
 test: $(REBAR)
 	$(REBAR) get-deps compile
@@ -42,7 +41,7 @@ test: $(REBAR)
 ##
 ## Doc targets
 ##
-docs: $(REBAR)
+edoc: $(REBAR)
 	$(REBAR) edoc
 
 edoc_private: $(REBAR)	
