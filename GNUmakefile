@@ -37,7 +37,7 @@ distclean: clean $(REBAR)
 test: $(REBAR)
 	$(REBAR) get-deps compile
 	$(REBAR) eunit -v skip_deps=true
-	$(REBAR) proper
+	$(REBAR) as test proper
 
 ##
 ## Doc targets
