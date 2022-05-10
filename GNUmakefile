@@ -48,3 +48,5 @@ docs: $(REBAR)
 edoc_private: $(REBAR)	
 	$(REBAR) as edoc_private edoc
 
+exdoc: $(REBAR)	
+	$(REBAR) ex_doc --logo doc/img/logo.png --output edoc
