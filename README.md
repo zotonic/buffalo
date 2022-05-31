@@ -1,3 +1,6 @@
+![Test](https://github.com/zotonic/buffalo/workflows/Test/badge.svg)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?logo=apache&logoColor=red)](https://www.apache.org/licenses/LICENSE-2.0)
+
 Buffalo
 =======
 
@@ -50,6 +53,7 @@ with the key.
     buffalo:queue(Key, MFA, #{ timeout => 50, deadline => 400 }).
 
 ## Testing
+
 ### Testing specification
 
 ```
@@ -58,3 +62,17 @@ with the key.
 	> proper:check_specs(buffalo).
 	> application:stop(buffalo).
 ```	
+
+## Documentation generation
+
+### Edoc
+
+#### Generate public API
+`rebar3 edoc`
+
+#### Generate private API
+`rebar3 as edoc_private edoc`
+
+### ExDoc
+
+`rebar3 ex_doc --logo doc/img/logo.png --output edoc`
