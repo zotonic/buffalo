@@ -132,7 +132,7 @@ init(_Args) ->
 -spec handle_call(Request, From, State) -> Result when 
 	Request :: {cancel, Key},
 	Key :: buffalo:key(),
-	From :: {pid(), atom()},
+	From :: gen_server:from(),
     State :: state(),
 	Result :: {reply, Reply, State},
 	Reply :: ok | {error, notfound};
@@ -142,14 +142,14 @@ init(_Args) ->
 	Key :: buffalo:key(),
 	MFA :: buffalo:mfargs(),
 	Options :: buffalo:options(),
-	From :: {pid(), atom()},
+	From :: gen_server:from(),
     State :: state(),
 	Result :: {reply, Reply, State},
 	Reply :: {ok, running} | {ok, existing} | {ok, new};
 (Request, From, State) -> Result when 
 	Request :: {status, Key},
 	Key :: buffalo:key(),
-	From :: {pid(), atom()},
+	From :: gen_server:from(),
     State :: state(),
 	Result :: {reply, Reply, State},
 	Reply :: {ok, queued} | {ok, running} | {error, notfound}.

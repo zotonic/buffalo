@@ -72,7 +72,7 @@ init({MFA, Metadata}) ->
 
 -spec handle_call(Request, From, State) -> Result when
 	Request :: term(),
-	From :: {pid(), atom()},
+	From :: gen_server:from(),
     State :: state(),
 	Result :: {reply, ok, State}.
 handle_call(_Call, _From, State) ->
