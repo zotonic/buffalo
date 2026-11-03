@@ -6,4 +6,10 @@
 -define(DEADLINE_MULTIPLIER, 5).
 
 %% @doc Record used for administrating which functions are queued.
--record(buffalo_entry, {key, mfa, timer, deadline}).
+-record(buffalo_entry, {
+    key :: buffalo:key(),
+    mfa :: buffalo:mfargs(),
+    timer :: reference(),
+    deadline :: non_neg_integer(),
+    logger_metadata = undefined :: logger:metadata() | undefined
+}).

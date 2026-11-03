@@ -1,10 +1,10 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2012-2022 Arjan Scherpenisse
+%% @copyright 2012-2026 Arjan Scherpenisse
 %% @doc Buffalo worker, executes a buffered task<br/>
 %% Implementation of `gen_server' behaviour.
 %% @end
 
-%% Copyright 2012-2022 Arjan Scherpenisse
+%% Copyright 2012-2026 Arjan Scherpenisse
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/1]).
+-export([start_link/1, start_link/2]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -44,8 +44,13 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start_link(Args) ->
-    gen_server:start_link(?MODULE, Args, []).
+%% @doc Start a worker with the calling process's logger metadata.
+start_link(MFA) ->
+    start_link(MFA, logger:get_process_metadata()).
+
+%% @doc Start a worker with the logger metadata captured when the task was queued.
+start_link(MFA, Metadata) ->
+    gen_server:start_link(?MODULE, {MFA, Metadata}, []).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -53,17 +58,21 @@ start_link(Args) ->
 
 %% @private
 
--spec init(MFA) -> Result when 
+-spec init({MFA, Metadata}) -> Result when
 	MFA :: mfargs(),
+    Metadata :: logger:metadata() | undefined,
 	Result :: {ok, MFA, 0}.
-init(MFA) ->
+init({MFA, undefined}) ->
+    {ok, MFA, 0};
+init({MFA, Metadata}) ->
+    logger:set_process_metadata(Metadata),
     {ok, MFA, 0}.
 
 %% @private
 
--spec handle_call(Request, From, State) -> Result when 
+-spec handle_call(Request, From, State) -> Result when
 	Request :: term(),
-	From :: {pid(), atom()},
+	From :: gen_server:from(),
     State :: state(),
 	Result :: {reply, ok, State}.
 handle_call(_Call, _From, State) ->
@@ -71,7 +80,7 @@ handle_call(_Call, _From, State) ->
 
 %% @private
 
--spec handle_cast(Request, State) -> Result when 
+-spec handle_cast(Request, State) -> Result when
 	Request :: term(),
     State :: state(),
 	Result :: {noreply, State}.
@@ -80,7 +89,7 @@ handle_cast(_Msg, State) ->
 
 %% @private
 
--spec handle_info(Info, State) -> Result when 
+-spec handle_info(Info, State) -> Result when
 	Info ::  timeout | term(),
 	State :: state(),
 	Result :: {stop, normal, undefined} | {noreply, buffalo:mfargs()}.
@@ -91,8 +100,15 @@ handle_info(timeout, {Module, Function, Args}) ->
         {ok, _} ->
             ok;
         Other ->
-            ?LOG_WARNING("[buffalo] call to ~p:~p returned ~p. Args were: ~p",
-                         [Module, Function, Other, Args])
+            ?LOG_WARNING(#{
+                in => buffalo,
+                text => <<"Non ok result from worker">>,
+                result => error,
+                reason => reason(Other),
+                module => Module,
+                function => Function,
+                args => Args
+            })
     end,
     {stop, normal, undefined};
 
@@ -117,3 +133,6 @@ terminate(_Reason, _State) ->
 	Result :: {ok, State}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+reason({error, Reason}) -> Reason;
+reason(Reason) -> Reason.
