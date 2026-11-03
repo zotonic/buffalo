@@ -1,8 +1,9 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2012-2019 Arjan Scherpenisse
+%% @copyright 2012-2026 Arjan Scherpenisse
 %% @doc Buffalo main API
+%% @end
 
-%% Copyright 2012-2019 Arjan Scherpenisse
+%% Copyright 2012-2026 Arjan Scherpenisse
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -57,6 +58,8 @@ start() ->
     application:start(buffalo).
 
 %% @doc Call the MFA after specified in `Options' time.
+%% The worker uses the logger metadata of the first caller to enqueue the task.
+%% Updating a queued task preserves that metadata.
 
 -spec queue(MFA, Opts) -> Result when
 	MFA :: mfargs(),
@@ -67,6 +70,8 @@ queue(MFA, Opts) ->
 
 %% @doc Call the MFA after specified in `Options' time 
 %%	using specified `Key'.
+%% The worker uses the logger metadata of the first caller to enqueue this key.
+%% Updating a queued task preserves that metadata.
 
 -spec queue(Key, MFA, Opts) -> Result when
 	Key :: key(), 

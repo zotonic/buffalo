@@ -1,10 +1,10 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2012-2019 Arjan Scherpenisse
+%% @copyright 2012-2026 Arjan Scherpenisse
 %% @doc Buffalo queuer: buffers, deduplicates, and starts workers<br/>
 %% Implementation of `gen_server' behaviour.
 %% @end
 
-%% Copyright 2012-2019 Arjan Scherpenisse
+%% Copyright 2012-2026 Arjan Scherpenisse
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -50,12 +50,7 @@
 					}.
 					
 %% @private
--type buffalo_entry() :: #buffalo_entry{
-							key :: buffalo:key(),
-							mfa :: buffalo:mfargs(),
-							timer :: reference(), 
-							deadline :: non_neg_integer()
-						}.
+-type buffalo_entry() :: #buffalo_entry{}.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -106,7 +101,8 @@ queue(MFA, Options) ->
 	Options :: buffalo:options(),
 	Result :: {ok, new | existing}.
 queue(Key, MFA, Options) ->
-    gen_server:call(?SERVER, {queue, Key, MFA, Options}).
+    Metadata = logger:get_process_metadata(),
+    gen_server:call(?SERVER, {queue, Key, MFA, Options, Metadata}).
 
 %% @doc Check if the task with the specified key is running or queued.
 
@@ -141,7 +137,8 @@ init(_Args) ->
 	Result :: {reply, Reply, State},
 	Reply :: ok | {error, notfound};
 (Request, From, State) -> Result when 
-	Request :: {queue, Key, MFA, Options},
+	Request :: {queue, Key, MFA, Options, Metadata},
+    Metadata :: logger:metadata() | undefined,
 	Key :: buffalo:key(),
 	MFA :: buffalo:mfargs(),
 	Options :: buffalo:options(),
@@ -167,17 +164,17 @@ handle_call({cancel, Key}, _From, State) ->
           end,
     {reply, Ret, State};
 
-handle_call({queue, Key, MFA, #{ is_drop_running := true } = Options}, _From, State) ->
+handle_call({queue, Key, MFA, #{ is_drop_running := true } = Options, Metadata}, _From, State) ->
     Ret = case maps:is_key(Key, State#state.key_to_pid) of
         true ->
             {ok, running};
         false ->
-            add_mfa(Key, MFA, Options)
+            add_mfa(Key, MFA, Options, Metadata)
     end,
     {reply, Ret, State};
 
-handle_call({queue, Key, MFA, Options}, _From, State) ->
-    Ret = add_mfa(Key, MFA, Options),
+handle_call({queue, Key, MFA, Options, Metadata}, _From, State) ->
+    Ret = add_mfa(Key, MFA, Options, Metadata),
     {reply, Ret, State};
 
 handle_call({status, Key}, _From, #state{ key_to_pid = KeyToPid } = State) ->
@@ -270,41 +267,49 @@ start_key(Key) ->
     case ets:lookup(buffalo, Key) of
         [] ->
             {error, notfound};
-        [ #buffalo_entry{mfa=MFA} ] ->
-            {ok, Pid} = supervisor:start_child(buffalo_worker_sup, [MFA]),
+        [ #buffalo_entry{mfa=MFA, logger_metadata=Metadata} ] ->
+            {ok, Pid} = supervisor:start_child(buffalo_worker_sup, [MFA, Metadata]),
             ets:delete(buffalo, Key),
             {ok, Pid}
     end.
 
-%% @equiv add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options)
+%% @equiv add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options, Metadata)
 
--spec add_mfa(Key, MFA, Options) -> Result when
+-spec add_mfa(Key, MFA, Options, Metadata) -> Result when
 	Key :: buffalo:key(),
 	MFA :: buffalo:mfargs(),
 	Options :: buffalo:options(),
+    Metadata :: logger:metadata() | undefined,
 	Result :: {ok, existing} | {ok, new}.
-add_mfa(Key, MFA, Options) ->
-    add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options).
+add_mfa(Key, MFA, Options, Metadata) ->
+    add_mfa_1(ets:lookup(buffalo, Key), current_msecs(), Key, MFA, Options, Metadata).
 
--spec add_mfa_1(BuffaloEntryList, Now, Key, MFA, Options) -> Result when
+-spec add_mfa_1(BuffaloEntryList, Now, Key, MFA, Options, Metadata) -> Result when
 	BuffaloEntryList :: [] | [buffalo_entry()], 
 	Now :: non_neg_integer(), 
 	Key :: buffalo:key(),
 	MFA :: buffalo:mfargs(),
 	Options :: buffalo:options(),
+    Metadata :: logger:metadata() | undefined,
 	Result :: {ok, existing} | {ok, new}.
-add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Options) ->
+add_mfa_1([#buffalo_entry{key=Key, timer=OldRef, deadline=Deadline} = Entry], Now, Key, MFA, Options, _Metadata) ->
     erlang:cancel_timer(OldRef),
     Timeout = timeout(Options),
     NextTimeout = erlang:max( 0, erlang:min(Timeout, Deadline-Now) ),
     NewRef = erlang:send_after(NextTimeout, self(), {timeout, Key}),
     ets:insert(buffalo, Entry#buffalo_entry{timer=NewRef, mfa=MFA}),
     {ok, existing};
-add_mfa_1([], Now, Key, MFA, Options) ->
+add_mfa_1([], Now, Key, MFA, Options, Metadata) ->
     Timeout = timeout(Options),
     Deadline = deadline(Options),
     NewRef = erlang:send_after(Timeout, self(), {timeout, Key}),
-    ets:insert(buffalo, #buffalo_entry{key=Key, mfa=MFA, timer=NewRef, deadline=Now+Deadline}),
+    ets:insert(buffalo, #buffalo_entry{
+        key=Key,
+        mfa=MFA,
+        timer=NewRef,
+        deadline=Now+Deadline,
+        logger_metadata=Metadata
+    }),
     {ok, new}.
 
 -spec timeout(Options) -> Result when

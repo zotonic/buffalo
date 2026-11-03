@@ -2,27 +2,31 @@ ERL       ?= erl
 ERLC      ?= $(ERL)c
 APP       := buffalo
 
+# Prefer rebar3 on PATH, falling back to a local download.
+REBAR := $(shell command -v rebar3 2>/dev/null)
+ifeq ($(REBAR),)
 REBAR := ./rebar3
+endif
 REBAR_URL := https://s3.amazonaws.com/rebar3/rebar3
 
 .PHONY: compile deps xref dialyzer test clean distclaen test edoc
 
 all: deps compile
 
-$(REBAR):
+./rebar3:
 	$(ERL) -noshell -s inets -s ssl \
-	  -eval '{ok, saved_to_file} = httpc:request(get, {"$(REBAR_URL)", []}, [], [{stream, "$(REBAR)"}])' \
+	  -eval '{ok, saved_to_file} = httpc:request(get, {"$(REBAR_URL)", []}, [], [{stream, "$@"}])' \
 	  -s init stop
-	chmod +x $(REBAR)
+	chmod +x $@
 
 compile: $(REBAR)
 	$(REBAR) compile
 
 xref: compile
-	./rebar3 xref
+	$(REBAR) xref
 
 dialyzer: compile
-	./rebar3 dialyzer
+	$(REBAR) dialyzer
 
 deps: $(REBAR)
 	$(REBAR) get-deps

@@ -1,6 +1,7 @@
 %% @author Paul Peregud <paulperegud@gmail.com>
 %% @copyright 2013-2019 Paul Peregud
 %% @doc Tests for buffalo
+%% @end
 
 %% Copyright 2013-2019 Paul Peregud
 %%

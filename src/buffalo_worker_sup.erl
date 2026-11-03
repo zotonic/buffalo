@@ -1,10 +1,10 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2012-2019 Arjan Scherpenisse
+%% @copyright 2012-2026 Arjan Scherpenisse
 %% @doc Buffalo supervisor for task workers<br/>
 %% Implementation of `supervisor' behaviour.
 %% @end
 
-%% Copyright 2012-2019 Arjan Scherpenisse
+%% Copyright 2012-2026 Arjan Scherpenisse
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -27,9 +27,6 @@
 
 %% Supervisor callbacks
 -export([init/1]).
-
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions

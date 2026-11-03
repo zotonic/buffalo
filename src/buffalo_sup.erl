@@ -1,9 +1,9 @@
 %% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2012-2019 Arjan Scherpenisse
+%% @copyright 2012-2026 Arjan Scherpenisse
 %% @doc Buffalo main supervisor
 %% @end
 
-%% Copyright 2012-2019 Arjan Scherpenisse
+%% Copyright 2012-2026 Arjan Scherpenisse
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
